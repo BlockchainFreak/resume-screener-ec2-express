@@ -9,6 +9,15 @@ import { getResumeData, createResumeData, updateResumeData } from './utils';
 import { EventManager } from "./EventManager";
 import { GPTModels, startChain } from './sequentialChain';
 
+if(fs.existsSync("uploads") === false) {
+    fs.mkdirSync("uploads");
+}
+
+if(fs.existsSync("records") === false) {
+    fs.mkdirSync("records");
+    fs.writeFileSync("records/resumes.json", "{}");
+}
+
 if(fs.existsSync("records/resumes.json") === false) {
     fs.writeFileSync("records/resumes.json", "{}");
 }
