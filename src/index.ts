@@ -14,6 +14,10 @@ if(fs.existsSync("uploads") === false) {
     fs.mkdirSync("uploads");
 }
 
+if(fs.existsSync("logs") === false) {
+    fs.mkdirSync("logs");
+}
+
 if(fs.existsSync("records") === false) {
     fs.mkdirSync("records");
     fs.writeFileSync("records/resumes.json", "{}");
