@@ -1,4 +1,7 @@
 .env
 node_modules
 logs
-uploads
+uploads/*
+records/*
+
+local-notes.txt

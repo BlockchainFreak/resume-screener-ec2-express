@@ -1,19 +1,24 @@
 import express, { Request, Response } from 'express';
+import fs from 'fs';
 import multer from "multer";
 import path from "path";
 import {
-    calculateHash, extractTextFromPDF, uploadFileToS3, getFilePresignedUrl,
-    getResume, insertResume, updateResume
+    calculateHash, extractTextFromPDF
 } from "./lib";
+import { getResumeData, createResumeData, updateResumeData } from './utils';
 import { EventManager } from "./EventManager";
 import { GPTModels, startChain } from './sequentialChain';
+
+if(fs.existsSync("records/resumes.json") === false) {
+    fs.writeFileSync("records/resumes.json", "{}");
+}
 
 // Set up Multer storage
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, './uploads');
     },
-    filename: (req, file, cb) => {
+    filename: async (req, file, cb) => {
         cb(null, file.originalname);
     }
 });
@@ -52,11 +57,14 @@ app.post("/process-resume", upload.single('file'), async (req, res) => {
             res.status(400).json({ error: "No file uploaded" });
             return;
         }
-        const { originalname, path, size, mimetype } = file;
-
+        const { originalname, path } = file;
         const hash = await calculateHash(path);
 
-        const resume = await getResume(hash);
+        // rename
+        fs.renameSync(path, `./uploads/${hash}.pdf`)
+
+        const resume = getResumeData(hash);
+
         if (resume) {
             if (resume.status === "completed") {
                 // Conflict
@@ -64,34 +72,33 @@ app.post("/process-resume", upload.single('file'), async (req, res) => {
             }
             else if (resume.status === "processing") {
                 // Accepted
-                res.status(202).json({ message: `${originalname} file has been enqueued with hash ${hash}` });
+                res.status(202).json({ message: `${originalname} file is in processing and has already been enqueued with hash ${hash}` });
             }
             return;
         }
 
-        const resume_content = await extractTextFromPDF(path);
+        const resume_content = await extractTextFromPDF(`./uploads/${hash}.pdf`);
 
         // create a db record
-        await insertResume({
+        createResumeData({
             id: hash,
             size: file.size,
             name: file.originalname,
             type: file.mimetype,
             status: "processing",
             date: new Date().toISOString(),
-            results: null,
+            results: "",
         });
 
-        // upload to s3
-        const s3Url = await uploadFileToS3(hash, path);
-
-        res.json({ message: `${originalname} file has been enqueued with hash ${hash}`, url: s3Url });
-        responseSent = true;
-
+        console.log("Starting chain")
         const response = await startChain({ fileHash: hash, resume_content, modelName, eventManager });
-        console.log(response)
+        
+        updateResumeData(hash, { results: response, status: "completed" })
+
+        res.json({ message: `${originalname} file has been enqueued with hash ${hash}` });
     }
     catch (err: any) {
+        console.trace(err);
         if (!responseSent) {
             res.status(500).json({ error: JSON.stringify(err) });
         }
@@ -113,7 +120,7 @@ app.get("/subscribe", async (req, res) => {
 
 app.get("/resume/:id", async (req, res) => {
     const id = req.params.id;
-    const resume = await getResume(id);
+    const resume = getResumeData(id);
     if (!resume) {
         res.status(404).json({ error: "Resume not found" });
         return;
@@ -121,11 +128,13 @@ app.get("/resume/:id", async (req, res) => {
     res.json(resume);
 })
 
-app.get("/resume/:id/url", async (req, res) => {
+
+app.get("/resume/:id/file", async (req, res) => {
     try {
         const id = req.params.id;
-        const url = await getFilePresignedUrl(id);
-        res.json({ url });
+        const content = fs.readFileSync(`./uploads/${id}.pdf`);
+        const base64 = content.toString('base64');
+        res.json({ base64 });
     }
     catch (err: any) {
         res.status(500).json({ error: JSON.stringify(err) });

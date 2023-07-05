@@ -6,6 +6,7 @@
             "es6"
         ],
         "outDir": "dist",
+        "allowJs": true,
         "sourceMap": true,
         "strict": true,
         "esModuleInterop": true,

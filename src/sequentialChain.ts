@@ -109,5 +109,5 @@ export const startChain = async ({ fileHash, resume_content, modelName, eventMan
 
     const response = await resumeChain.call({ resume_content, json_schema })
 
-    return response
+    return response["json"] as string
 }
