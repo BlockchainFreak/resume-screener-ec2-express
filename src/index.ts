@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import fs from 'fs';
 import multer from "multer";
 import path from "path";
+import cors from "cors";
 import {
     calculateHash, extractTextFromPDF
 } from "./lib";
@@ -45,6 +46,7 @@ const upload = multer({
 });
 
 const app = express();
+app.use(cors());
 const eventManager = new EventManager();
 
 const PORT = 5000
