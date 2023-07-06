@@ -54,30 +54,34 @@ Industry: h1, h2, h3
 const json_schema = JSON.stringify({
     "Skill Wise Experience": [
         {
-            "Skill Name": "s1",
-            "Total Experience (in years)": 0,
+            "Skill Name": "<skill name>",
+            "Total Experience (in years)": 1,
             "Breakdown": "x years (company a), y years (company b)",
         }
     ],
     "Industry Wise Experience": [
         {
-            "Industry Name": "h1",
-            "Total Experience (in years)": 0,
+            "Industry Name": "<industry name>",
+            "Total Experience (in years)": 3,
             "Breakdown": "x years (company a)",
         }
     ]
 })
 
+const TICKS = "```"
 const convertToJSONWithSchema = `
-###
+"""
 {work_experience}
-###
+"""
 
-The schema of JSON object is as follows:
-"""{json_schema}"""
-convert this into JSON object with no indentation. There should be no indentation in the response JSON.
-convert this into JSON object with no indentation. There should be no indentation in the response JSON.
-Important: your response should be parsable by JSON.parse() function.
+rewrite the following as json object with "Skill Wise Experience" and "Industry Wise Experience" as keys. Both keys are an array of objects (see the format below for more details)
+
+Format of the response:
+${TICKS}json
+{json_schema}
+${TICKS}
+
+Note: the above schema is just an example. The array can have multiple objects but the keys should be the same.
 `
 
 type StartChainParams = {
@@ -85,6 +89,45 @@ type StartChainParams = {
     resume_content: string;
     modelName: GPTModels;
     eventManager: EventManager;
+}
+
+const isParseable = (json: string) => {
+    try {
+        JSON.parse(json)
+        return true
+    }
+    catch (e) { return false }
+}
+
+type ParsedResume = {
+    "Work Experience": string;
+    "Education": string;
+    "Skills": string;
+    "Summary": string;
+    "Projects": string;
+    "Certifications": string;
+}
+const fields = ["Work Experience", "Education", "Skills", "Summary", "Projects", "Certifications"]
+
+
+export function parseMd(md: string) {
+    const rege = /\n##\s/g
+    const sections = md.replace(rege, "@@@\n## ").split("@@@\n")
+    const parsed = {} as any
+    for (const section of sections) {
+        const [title, ...content] = section.split("\n")
+        parsed[title.replace("## ", "")] = content.join("\n")
+    }
+    for (const field of fields) {
+        parsed[field] = parsed[field] || ""
+    }
+    return parsed as ParsedResume
+}
+
+function trimExtraText(input: string): string {
+    const startIndex = input.indexOf('{');
+    const endIndex = input.lastIndexOf('}') + 1;
+    return input.substring(startIndex, endIndex);
 }
 
 export const startChain = async ({ fileHash, resume_content, modelName, eventManager }: StartChainParams) => {
@@ -109,5 +152,7 @@ export const startChain = async ({ fileHash, resume_content, modelName, eventMan
 
     const response = await resumeChain.call({ resume_content, json_schema })
 
-    return response["json"] as string
+    const json_response = response["json"] as string
+
+    return JSON.stringify(JSON.parse(trimExtraText(json_response)))
 }

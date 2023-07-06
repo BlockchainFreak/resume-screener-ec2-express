@@ -54,7 +54,7 @@ app.use(cors());
 const eventManager = new EventManager();
 
 const PORT = 5000
-const modelName: GPTModels = "gpt-3.5-turbo-16k"
+const modelName: GPTModels = "gpt-4"
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
 
