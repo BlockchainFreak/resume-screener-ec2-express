@@ -26,6 +26,10 @@ export class EventManager {
         fs.appendFile('logs/connections.log', `[${new Date().toLocaleString()}]: subscribed\n\n`, () => {})
     }
 
+    ping() {
+        return this.cache;
+    }
+
     unsubscribe(res: Response) {
         this.subscribers = this.subscribers.filter(subscriber => subscriber !== res);
         fs.appendFile('logs/connections.log', `[${new Date().toLocaleString()}]: unsubscribed\n\n`, () => {})
@@ -62,6 +66,11 @@ export class EventManager {
     }
 
     removeCache(fileHash: string) {
-        delete this.cache[fileHash];
+        try{
+            delete this.cache[fileHash];
+        }
+        catch(err) {
+            console.error(err);
+        }
     }
 }

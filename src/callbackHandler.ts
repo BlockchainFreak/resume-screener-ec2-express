@@ -50,6 +50,7 @@ export class LLMCallbackHandler extends BaseCallbackHandler {
                 eventType: "progress",
                 data: this.progressIndex.toString()
             })
+            this.eventManager.removeCache(this.fileHash);
         }
         this.sendBatch();
     }

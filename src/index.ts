@@ -10,20 +10,20 @@ import { getResumeData, createResumeData, updateResumeData } from './utils';
 import { EventManager } from "./EventManager";
 import { GPTModels, startChain } from './sequentialChain';
 
-if(fs.existsSync("uploads") === false) {
+if (fs.existsSync("uploads") === false) {
     fs.mkdirSync("uploads");
 }
 
-if(fs.existsSync("logs") === false) {
+if (fs.existsSync("logs") === false) {
     fs.mkdirSync("logs");
 }
 
-if(fs.existsSync("records") === false) {
+if (fs.existsSync("records") === false) {
     fs.mkdirSync("records");
     fs.writeFileSync("records/resumes.json", "{}");
 }
 
-if(fs.existsSync("records/resumes.json") === false) {
+if (fs.existsSync("records/resumes.json") === false) {
     fs.writeFileSync("records/resumes.json", "{}");
 }
 
@@ -84,12 +84,18 @@ app.post("/process-resume", upload.single('file'), async (req, res) => {
             if (resume.status === "completed") {
                 // Conflict
                 res.status(409).json({ message: `${originalname} file has already been processed with hash ${hash}` });
+                return;
             }
             else if (resume.status === "processing") {
                 // Accepted
                 res.status(202).json({ message: `${originalname} file is in processing and has already been enqueued with hash ${hash}` });
+                return;
             }
-            return;
+            else if (resume.status === "failed") {
+                // Accepted
+                res.status(202).json({ message: `${originalname} file was failed while processing and now is enqueued again with hash ${hash}` });
+                responseSent = true;
+            }
         }
 
         const resume_content = await extractTextFromPDF(`./uploads/${hash}.pdf`);
@@ -105,20 +111,33 @@ app.post("/process-resume", upload.single('file'), async (req, res) => {
             results: "",
         });
 
-        console.log("Starting chain")
-        const response = await startChain({ fileHash: hash, resume_content, modelName, eventManager });
-        
-        updateResumeData(hash, { results: response, status: "completed" })
+        if (responseSent === false) {
+            responseSent = true;
+            res.json({ message: `${originalname} file has been enqueued with hash ${hash}` });
+        }
 
-        res.json({ message: `${originalname} file has been enqueued with hash ${hash}` });
+        console.log("Starting chain")
+        startChain({ fileHash: hash, resume_content, modelName, eventManager })
+            .then((results) => {
+                updateResumeData(hash, { results, status: "completed" })
+            })
+            .catch((err) => {
+                console.log(err)
+                updateResumeData(hash, { status: "failed" })
+            })
     }
     catch (err: any) {
         console.trace(err);
-        if (!responseSent) {
+        if (responseSent === false) {
             res.status(500).json({ error: JSON.stringify(err) });
         }
     }
 });
+
+app.get("/ping" , async (req, res) => {
+    const cache = eventManager.ping();
+    res.json({ cache });
+})
 
 app.get("/subscribe", async (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -131,6 +150,16 @@ app.get("/subscribe", async (req, res) => {
     req.on('close', () => {
         eventManager.unsubscribe(res)
     })
+})
+
+app.get("/get-resumes", async (req, res) => {
+    try {
+        const resumes = fs.readFileSync("records/resumes.json", { encoding: "utf-8" });
+        res.json(JSON.parse(resumes));
+    }
+    catch (err: any) {
+        res.status(500).json({ error: JSON.stringify(err) });
+    }
 })
 
 app.get("/resume/:id", async (req, res) => {
