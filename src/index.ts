@@ -125,6 +125,9 @@ app.post("/process-resume", upload.single('file'), async (req, res) => {
                 console.log(err)
                 updateResumeData(hash, { status: "failed" })
             })
+            .finally(() => {
+                eventManager.removeCache(hash);
+            })
     }
     catch (err: any) {
         console.trace(err);

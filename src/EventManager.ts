@@ -53,15 +53,18 @@ export class EventManager {
             const { fileHash } = event;
             this.cache[fileHash] = {
                 progress: parseInt(event.data),
-                data: this.cache[fileHash]?.data || ""
+                data: this.cache[fileHash]?.data ?? ""
             }
         }
         if(event.eventType === "data") {
             const { fileHash } = event;
-            this.cache[fileHash] = {
-                progress: this.cache[fileHash]?.progress || 0,
-                data: this.cache[fileHash]?.data + event.data
-            }
+            this.cache[fileHash] = this.cache[fileHash] ? ({
+                progress: this.cache[fileHash].progress,
+                data: this.cache[fileHash].data + event.data
+            }) : ({
+                progress: 1,
+                data: event.data
+            })
         }
     }
 
