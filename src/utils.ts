@@ -24,6 +24,6 @@ export const updateResumeData = (id: string, data: Partial<ResumeDataDB>) => {
 export const deleteResumeData = (id: string) => {
     const content = readFileSync("records/resumes.json", "utf-8");
     const records = JSON.parse(content) as Record<string, ResumeDataDB>;
-    delete records[id];
+    try { delete records[id] } catch (e) { }
     writeFileSync("records/resumes.json", JSON.stringify(records, null, 2));
 }

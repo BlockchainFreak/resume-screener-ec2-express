@@ -6,7 +6,7 @@ import cors from "cors";
 import {
     calculateHash, extractTextFromPDF
 } from "./lib";
-import { getResumeData, createResumeData, updateResumeData } from './utils';
+import { getResumeData, createResumeData, updateResumeData, deleteResumeData } from './utils';
 import { EventManager } from "./EventManager";
 import { GPTModels, startChain } from './sequentialChain';
 
@@ -184,3 +184,20 @@ app.get("/resume/:id/file", async (req, res) => {
         res.status(500).json({ error: JSON.stringify(err) });
     }
 });
+
+app.delete("/remove-resume/:id", async (req, res) => {
+    try {
+        const id = req.params.id;
+        const resume = getResumeData(id);
+        if (!resume) {
+            res.status(404).json({ error: "Resume not found" });
+            return;
+        }
+        deleteResumeData(id);
+        fs.unlinkSync(`./uploads/${id}.pdf`);
+        res.json({ message: "Resume deleted" });
+    }
+    catch (err: any) {
+        res.status(500).json({ error: JSON.stringify(err) });
+    }
+})
