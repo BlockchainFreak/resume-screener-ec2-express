@@ -3,6 +3,7 @@ import fs from 'fs';
 import multer from "multer";
 import path from "path";
 import cors from "cors";
+import nocache from "nocache"
 import {
     calculateHash, extractTextFromPDF
 } from "./lib";
@@ -155,7 +156,7 @@ app.get("/subscribe", async (req, res) => {
     })
 })
 
-app.get("/get-resumes", async (req, res) => {
+app.get("/get-resumes", nocache() ,async (req, res) => {
     try {
         const resumes = fs.readFileSync("records/resumes.json", { encoding: "utf-8" });
         res.json(JSON.parse(resumes));
