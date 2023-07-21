@@ -6,6 +6,7 @@ export const ResumeDataSchemaDB = mysqlTable("resume_data", {
     name: varchar("name", { length: 1024 }).notNull(),
     size: int("size").notNull(),
     type: varchar("type", { length: 64 }).notNull(),
+    processType: mysqlEnum("processType",["resume", "jd"]).notNull(),
     results: varchar("results", { length: 2048 }).notNull(),
     status: mysqlEnum("status", ["pending", "processing", "completed", "failed"]).notNull(),
     date: varchar("date", { length: 64 }).notNull(),

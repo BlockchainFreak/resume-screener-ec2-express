@@ -4,6 +4,7 @@ import multer from "multer";
 import path from "path";
 import cors from "cors";
 import nocache from "nocache"
+import { processjD } from './jdChain';
 import {
     calculateHash, extractTextFromPDF
 } from "./lib";
@@ -68,6 +69,11 @@ app.post("/process-resume", upload.single('file'), async (req, res) => {
     let responseSent = false;
 
     try {
+        const type = req.body.type as "jd" | "resume"
+        if (!type || (type !== "jd" && type !== "resume")) {
+            res.status(400).json({ error: "Invalid 'type' paramter" });
+            return;
+        }
         const file = req.file;
         if (!file) {
             res.status(400).json({ error: "No file uploaded" });
@@ -75,7 +81,6 @@ app.post("/process-resume", upload.single('file'), async (req, res) => {
         }
         const { originalname, path } = file;
         const hash = await calculateHash(path);
-
         // rename
         fs.renameSync(path, `./uploads/${hash}.pdf`)
 
@@ -99,11 +104,12 @@ app.post("/process-resume", upload.single('file'), async (req, res) => {
             }
         }
 
-        const resume_content = await extractTextFromPDF(`./uploads/${hash}.pdf`);
+        const file_content = await extractTextFromPDF(`./uploads/${hash}.pdf`);
 
         // create a db record
         createResumeData({
             id: hash,
+            processType: type,
             size: file.size,
             name: file.originalname,
             type: file.mimetype,
@@ -117,18 +123,30 @@ app.post("/process-resume", upload.single('file'), async (req, res) => {
             res.json({ message: `${originalname} file has been enqueued with hash ${hash}` });
         }
 
-        console.log("Starting chain")
-        startChain({ fileHash: hash, resume_content, modelName, eventManager })
-            .then((results) => {
-                updateResumeData(hash, { results, status: "completed" })
-            })
-            .catch((err) => {
-                console.log(err)
-                updateResumeData(hash, { status: "failed" })
-            })
-            .finally(() => {
-                eventManager.removeCache(hash);
-            })
+        if (type === "resume") {
+            console.log("Starting chain")
+            startChain({ fileHash: hash, resume_content: file_content, modelName, eventManager })
+                .then((results) => {
+                    updateResumeData(hash, { results, status: "completed" })
+                })
+                .catch((err) => {
+                    console.log(err)
+                    updateResumeData(hash, { status: "failed" })
+                })
+                .finally(() => {
+                    eventManager.removeCache(hash);
+                })
+        }
+        else {
+            processjD(file_content)
+                .then((results) => {
+                    updateResumeData(hash, { results, status: "completed" })
+                })
+                .catch((err) => {
+                    console.log(err)
+                    updateResumeData(hash, { status: "failed" })
+                })
+        }
     }
     catch (err: any) {
         console.trace(err);
@@ -138,7 +156,7 @@ app.post("/process-resume", upload.single('file'), async (req, res) => {
     }
 });
 
-app.get("/ping" , async (req, res) => {
+app.get("/ping", async (req, res) => {
     const cache = eventManager.ping();
     res.json({ cache });
 })
@@ -156,7 +174,7 @@ app.get("/subscribe", async (req, res) => {
     })
 })
 
-app.get("/get-resumes", nocache() ,async (req, res) => {
+app.get("/get-resumes", nocache(), async (req, res) => {
     try {
         const resumes = fs.readFileSync("records/resumes.json", { encoding: "utf-8" });
         res.json(JSON.parse(resumes));
